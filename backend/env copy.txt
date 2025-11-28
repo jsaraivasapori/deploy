@@ -1,0 +1,11 @@
+# Porta da API
+PORT=3000
+
+# Conexão com o MongoDB (Rodando no Docker, acessado via localhost)
+MONGO_URI=mongodb://localhost:27017/gdash
+
+JWT_SECRET=SegredoSuperSecretoDoGdash123
+GEMINI_API_KEY =AIzaSyCdXD7aD-T6_xESZleGbizoHiPogdxBQzw
+
+DEFAULT_ADMIN_EMAIL = admin@gdash.com
+DEFAULT_ADMIN_PASSWORD = admin1234

@@ -1,0 +1,113 @@
+version: "3.8"
+
+services:
+  # ---------------------------
+  # INFRAESTRUTURA
+  # ---------------------------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: gdash_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    networks:
+      - gdash-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:latest
+    container_name: gdash_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - gdash-network
+
+  # ---------------------------
+  # APLICAÇÕES
+  # ---------------------------
+
+  # API NESTJS
+  backend:
+    build: ./backend
+    container_name: gdash_backend
+    ports:
+      - "3000:3000"
+    environment:
+      # Note: Aqui dentro da rede docker, o host do mongo é 'mongodb'
+      MONGO_URI: mongodb://mongodb:27017/gdash
+      JWT_SECRET: SuaChaveSecretaProducao123
+      DEFAULT_ADMIN_EMAIL: admin@gdash.com
+      DEFAULT_ADMIN_PASSWORD: admin123
+      GEMINI_API_KEY: ${GEMINI_API_KEY} # Lê do seu PC ou .env raiz
+    depends_on:
+      - mongodb
+    networks:
+      - gdash-network
+
+  # WORKER GO
+  worker:
+    build: ./worker
+    container_name: gdash_worker
+    environment:
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672/
+      QUEUE_NAME: weather_data
+      # O Go chama o Backend pelo nome do serviço 'backend'
+      API_URL: http://backend:3000/api/v1/weather/logs
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - gdash-network
+
+  # COLLECTOR PYTHON
+  collector:
+    build: ./collector
+    container_name: gdash_collector
+    environment:
+      LATITUDE: "-16.72"
+      LONGITUDE: "-43.86"
+      COLLECT_INTERVAL: "15"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin
+      QUEUE_NAME: weather_data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - gdash-network
+
+  # FRONTEND REACT
+  frontend:
+    build:
+      context: ./frontend
+      # Em produção real, o front roda no browser do cliente, então ele precisa
+      # acessar a API pelo endereço público. Localmente é localhost.
+      args:
+        VITE_API_URL: http://localhost:3000/api/v1
+    container_name: gdash_frontend
+    ports:
+      - "80:80" # Acessa via http://localhost (sem porta)
+    depends_on:
+      - backend
+    networks:
+      - gdash-network
+
+networks:
+  gdash-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
