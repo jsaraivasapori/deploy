@@ -1,118 +1,92 @@
 version: "3.8"
 
 services:
-  # ---------------------------
-  # INFRAESTRUTURA
-  # ---------------------------
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: gdash_rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS}
-    networks:
-      - gdash-network
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # ----------------------------------------------------------------
+  # INFRAESTRUTURA (Blindada 🔒)
+  # ----------------------------------------------------------------
 
-  mongodb:
+  mongo:
     image: mongo:latest
-    container_name: gdash_mongo
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    container_name: app_mongo
+    restart: always
+    # 🔒 SEGURANÇA: Portas removidas para evitar acesso externo
+    # O acesso continua funcionando internamente via 'app_network'
     volumes:
       - mongo_data:/data/db
     networks:
-      - gdash-network
+      - app_network
 
-  # ---------------------------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: app_rabbitmq
+    restart: always
+    # 🔒 SEGURANÇA: Portas removidas.
+    # O painel de gestão (15672) não ficará acessível publicamente (use túnel SSH se precisar ver)
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    networks:
+      - app_network
+
+  # ----------------------------------------------------------------
   # APLICAÇÕES
-  # ---------------------------
+  # ----------------------------------------------------------------
 
-  # API NESTJS
   backend:
     build: ./backend
-    container_name: gdash_backend
+    container_name: app_backend
+    restart: always # Mudado para sempre reiniciar se cair
     ports:
-      - "3000:3000"
-    # Carrega todo o .env para dentro do container
+      - "3000:3000" # Aberto para receber requisições do Frontend
     env_file:
-      - .env
+      - ./backend/.env
     depends_on:
-      - mongodb
+      - mongo
+      - rabbitmq
     networks:
-      - gdash-network
+      - app_network
 
-  # WORKER GO
-  worker:
-    build: ./worker
-    container_name: gdash_worker
+  frontend:
+    build: ./frontend
+    container_name: app_frontend
+    restart: always
+    ports:
+      - "5173:5173" # Aberto para o usuário acessar o site
     env_file:
-      - .env
-    environment:
-      # Sobrescreve variaveis específicas se necessário,
-      # ou garante mapeamento correto das que vêm do .env
-      RABBITMQ_URL: ${RABBITMQ_INTERNAL_URL}
-      QUEUE_NAME: weather_data
-      # Comunicação container-to-container usa o nome do serviço 'backend'
-      API_URL: http://backend:3000/api/v1/weather/logs
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      backend:
-        condition: service_started
+      - ./frontend/.env
+    # 🚀 PERFORMANCE: Removido CHOKIDAR (desnecessário em produção Linux)
     networks:
-      - gdash-network
+      - app_network
 
-  # COLLECTOR PYTHON
   collector:
     build: ./collector
-    container_name: gdash_collector
+    container_name: app_collector
+    restart: always
     env_file:
-      - .env
-    environment:
-      # Passando explicitamente para garantir que o script Python pegue
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBIT_USER}
-      RABBITMQ_PASS: ${RABBIT_PASS}
-      QUEUE_NAME: weather_data
-      LATITUDE: ${LATITUDE}
-      LONGITUDE: ${LONGITUDE}
-      COLLECT_INTERVAL: ${COLLECT_INTERVAL}
+      - ./collector/.env
     depends_on:
-      rabbitmq:
-        condition: service_healthy
+      - rabbitmq
     networks:
-      - gdash-network
+      - app_network
 
-  # FRONTEND REACT
-  frontend:
-    build:
-      context: ./frontend
-      # Passamos a variavel do .env para o ARG do build do Docker
-      args:
-        VITE_API_URL: ${VITE_API_URL}
-    container_name: gdash_frontend
-    ports:
-      - "80:80"
+  worker:
+    build: ./worker
+    container_name: app_worker
+    restart: always
+    env_file:
+      - ./worker/.env
     depends_on:
+      - rabbitmq
       - backend
     networks:
-      - gdash-network
+      - app_network
 
-networks:
-  gdash-network:
-    driver: bridge
-
+# ----------------------------------------------------------------
+# VOLUMES E REDES
+# ----------------------------------------------------------------
 volumes:
   mongo_data:
+
+networks:
+  app_network:
+    driver: bridge

@@ -1,19 +1,18 @@
-# Imagem base leve do Python
 FROM python:3.10-slim
 
-# Define diretório de trabalho
-WORKDIR /app
-
-# --- MELHORIA AQUI ---
-# Garante que os logs (prints) apareçam imediatamente no console do Docker
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Copia dependências e instala
+# --- CORREÇÃO AQUI ---
+# Isso diz ao Python: "A raiz de todos os imports é a pasta /app"
+ENV PYTHONPATH=/app
+
+WORKDIR /app
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia o código fonte
 COPY . .
 
-# Comando de execução
-CMD ["python", "-m", "src.main"]
+# Comando para rodar
+CMD ["python", "src/main.py"]

@@ -69,7 +69,7 @@ export class WeatherService {
     const weatherData = await this.weatherModel
       .find()
       .sort({ createdAt: -1 })
-      .limit(5)
+      .limit(10)
       .lean()
       .exec();
 
@@ -106,7 +106,7 @@ export class WeatherService {
           "alert": "Algum alerta? (Calor, Frio, Chuva, Vento) ou 'Normal'",
           "recommendation": "Dica curta para a pessoa (Ex: Beber água, levar guarda-chuva)",
            "temperature_next_hour": "Temperatura média da coleção em °C",
-          "predicted_weather_next_hour": "Previsão do tempo para a próxima hora  em uma frase curta deve incluir valor da humidade e vento não deve incluir temperatura"
+          "predicted_weather_next_hour": "Previsão do tempo para a próxima hora  em uma frase curta"
         }
       `;
 

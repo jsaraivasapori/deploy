@@ -1,32 +1,24 @@
-# --- Estágio 1: Build ---
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-# Instala tudo para conseguir fazer o build
-RUN npm install 
-COPY . .
-# Gera a pasta /dist
-RUN npm run build 
-
-# --- Estágio 2: Dependências de Produção (Passo extra para limpar) ---
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-# Instala APENAS o necessário para rodar (omite devDependencies)
-RUN npm install --only=production
-
-# --- Estágio 3: Production ---
+# 1. Imagem base do Node (versão leve)
 FROM node:20-alpine
+
+# 2. Define o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Copia as dependências limpas do estágio 2
-COPY --from=deps /app/node_modules ./node_modules
-# Copia o build do estágio 1
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
+# 3. Copia os arquivos de dependências primeiro
+# Isso aproveita o cache do Docker se nada mudar nas dependências
+COPY package*.json ./
 
+# 4. Instala as dependências
+RUN npm install
+
+# 5. Copia o restante do código fonte do projeto
+COPY . .
+
+# 6. Compila o projeto (Build do NestJS)
+RUN npm run build
+
+# 7. Expõe a porta que a aplicação usa
 EXPOSE 3000
 
-# Dica: O Nest geralmente gera um arquivo main.js. 
-# O comando explícito costuma ser dist/main.js
-CMD ["node", "dist/main.js"]
+# 8. Comando para iniciar a aplicação compilada
+CMD ["npm", "run", "start:prod"]

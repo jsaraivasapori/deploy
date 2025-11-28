@@ -1,31 +1,20 @@
-# --- Estágio 1: Build do React ---
-FROM node:20-alpine AS builder
+# 1. Base image (mesma versão do back para consistência)
+FROM node:20-alpine
 
+
+# 2. Diretório de trabalho
 WORKDIR /app
 
-# Instala dependências
+# 3. Instala dependências
 COPY package*.json ./
 RUN npm install
 
-# Copia código e builda (Gera a pasta dist)
+# 4. Copia o código fonte
 COPY . .
-# Argumento de build para a URL da API (pode ser sobrescrito)
-ARG VITE_API_URL=http://localhost:3000/api/v1
-ENV VITE_API_URL=$VITE_API_URL
-RUN npm run build
 
-# --- Estágio 2: Servidor Nginx ---
-FROM nginx:alpine
+# 5. Expõe a porta padrão do Vite
+EXPOSE 5173
 
-# Remove configurações padrão do Nginx
-RUN rm /etc/nginx/conf.d/default.conf
-
-# Copia nossa configuração
-COPY nginx.conf /etc/nginx/conf.d
-
-# Copia os arquivos estáticos gerados pelo React
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# 6. Roda em modo desenvolvimento
+# O parâmetro '--host' é OBRIGATÓRIO para acessar via navegador fora do Docker
+CMD ["npm", "run", "dev", "--", "--host"]

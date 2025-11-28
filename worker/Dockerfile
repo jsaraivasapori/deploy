@@ -1,31 +1,31 @@
 # --- Estágio 1: Build ---
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Baixa dependências
+# Copia dependências
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copia código
+# Copia o código
 COPY . .
 
-# --- MELHORIA 1: Compilação Estática ---
-# CGO_ENABLED=0: Garante que o binário não dependa de bibliotecas C do sistema (evita erro "file not found" no Alpine)
-# GOOS=linux: Força o build para Linux (caso você rode o build de um Mac/Windows, por precaução)
-RUN CGO_ENABLED=0 GOOS=linux go build -o worker-binary main.go
+# Compila o binário estático
+# CGO_ENABLED=0 é vital para rodar no Alpine
+RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 
-# --- Estágio 2: Runtime ---
+# --- Estágio 2: Rodar ---
 FROM alpine:latest
 
-# --- MELHORIA 2: Certificados SSL ---
-# Necessário se o seu Worker fizer chamadas para APIs HTTPS externas
-RUN apk --no-cache add ca-certificates
+WORKDIR /app
 
-WORKDIR /root/
+# Copia o executável especificamente para /app/main
+COPY --from=builder /app/main /app/main
+COPY --from=builder /app/.env /app/.env
 
-# Copia apenas o binário compilado
-COPY --from=builder /app/worker-binary .
+# Dá permissão de execução (garantia extra)
+RUN chmod +x /app/main
 
-# Comando de execução
-CMD ["./worker-binary"]
+# Comandos de execução usando CAMINHO ABSOLUTO
+# Isso evita o erro "file not found"
+CMD ["/app/main"]

@@ -5,10 +5,10 @@ export const authService = {
   async login(credentials: LoginDto): Promise<void> {
     const { data } = await api.post<LoginResponse>("/auth/login", credentials);
 
-    localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("authToken", data.authToken);
   },
 
   logout() {
-    localStorage.removeItem("access_token");
+    localStorage.removeItem("authToken");
   },
 };
