@@ -11,8 +11,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: admin
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS}
     networks:
       - gdash-network
     healthcheck:
@@ -26,6 +26,9 @@ services:
     container_name: gdash_mongo
     ports:
       - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
       - mongo_data:/data/db
     networks:
@@ -41,13 +44,9 @@ services:
     container_name: gdash_backend
     ports:
       - "3000:3000"
-    environment:
-      # Note: Aqui dentro da rede docker, o host do mongo é 'mongodb'
-      MONGO_URI: mongodb://mongodb:27017/gdash
-      JWT_SECRET: SuaChaveSecretaProducao123
-      DEFAULT_ADMIN_EMAIL: admin@gdash.com
-      DEFAULT_ADMIN_PASSWORD: admin123
-      GEMINI_API_KEY: ${GEMINI_API_KEY} # Lê do seu PC ou .env raiz
+    # Carrega todo o .env para dentro do container
+    env_file:
+      - .env
     depends_on:
       - mongodb
     networks:
@@ -57,10 +56,14 @@ services:
   worker:
     build: ./worker
     container_name: gdash_worker
+    env_file:
+      - .env
     environment:
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672/
+      # Sobrescreve variaveis específicas se necessário,
+      # ou garante mapeamento correto das que vêm do .env
+      RABBITMQ_URL: ${RABBITMQ_INTERNAL_URL}
       QUEUE_NAME: weather_data
-      # O Go chama o Backend pelo nome do serviço 'backend'
+      # Comunicação container-to-container usa o nome do serviço 'backend'
       API_URL: http://backend:3000/api/v1/weather/logs
     depends_on:
       rabbitmq:
@@ -74,15 +77,18 @@ services:
   collector:
     build: ./collector
     container_name: gdash_collector
+    env_file:
+      - .env
     environment:
-      LATITUDE: "-16.72"
-      LONGITUDE: "-43.86"
-      COLLECT_INTERVAL: "15"
+      # Passando explicitamente para garantir que o script Python pegue
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
-      RABBITMQ_USER: admin
-      RABBITMQ_PASS: admin
+      RABBITMQ_USER: ${RABBIT_USER}
+      RABBITMQ_PASS: ${RABBIT_PASS}
       QUEUE_NAME: weather_data
+      LATITUDE: ${LATITUDE}
+      LONGITUDE: ${LONGITUDE}
+      COLLECT_INTERVAL: ${COLLECT_INTERVAL}
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -93,13 +99,12 @@ services:
   frontend:
     build:
       context: ./frontend
-      # Em produção real, o front roda no browser do cliente, então ele precisa
-      # acessar a API pelo endereço público. Localmente é localhost.
+      # Passamos a variavel do .env para o ARG do build do Docker
       args:
-        VITE_API_URL: http://localhost:3000/api/v1
+        VITE_API_URL: ${VITE_API_URL}
     container_name: gdash_frontend
     ports:
-      - "80:80" # Acessa via http://localhost (sem porta)
+      - "80:80"
     depends_on:
       - backend
     networks:

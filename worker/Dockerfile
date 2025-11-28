@@ -7,18 +7,25 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copia código e compila
+# Copia código
 COPY . .
-RUN go build -o worker-binary main.go
 
-# --- Estágio 2: Runtime (Imagem final leve) ---
+# --- MELHORIA 1: Compilação Estática ---
+# CGO_ENABLED=0: Garante que o binário não dependa de bibliotecas C do sistema (evita erro "file not found" no Alpine)
+# GOOS=linux: Força o build para Linux (caso você rode o build de um Mac/Windows, por precaução)
+RUN CGO_ENABLED=0 GOOS=linux go build -o worker-binary main.go
+
+# --- Estágio 2: Runtime ---
 FROM alpine:latest
+
+# --- MELHORIA 2: Certificados SSL ---
+# Necessário se o seu Worker fizer chamadas para APIs HTTPS externas
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-# Copia apenas o binário compilado do estágio anterior
+# Copia apenas o binário compilado
 COPY --from=builder /app/worker-binary .
-# Copia o .env se necessário, mas idealmente usa-se variaveis de ambiente do docker-compose
 
 # Comando de execução
 CMD ["./worker-binary"]
