@@ -92,15 +92,15 @@ export class WeatherService {
       );
 
       const prompt = `
-        Atue como um meteorologista. Analise estes dados climáticos recentes (JSON): ${dataContext}.
+        Atue como um meteorologista. Analise estes dados climáticos recentes (JSON): ${dataContext} e use um vocabulario rico sem repetir muito as palavras.
         
         Retorne APENAS um objeto JSON seguindo estritamente este esquema:
         {
           "summary": "Resumo da tendência climática em uma frase curta (Português)",
           "alert": "Algum alerta? (Calor, Frio, Chuva, Vento) ou 'Normal'",
           "recommendation": "Dica curta para a pessoa (Ex: Beber água, levar guarda-chuva)",
-           "temperature_next_hour": "Temperatura média da coleção em °C",
-          "predicted_weather_next_hour": "Previsão do tempo para a próxima hora  em uma frase curta"
+           "temperature_next_hour": "Tendencia de temperatura para coleção em °C",
+          "predicted_weather_next_hour": "Previsão do tempo para a próxima hora informando humidade e vento em uma frase curta"
         }
       `;
 
