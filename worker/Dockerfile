@@ -1,31 +1,33 @@
-# --- Estágio 1: Build ---
+# --- Estágio 1: Build (Compilação) ---
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Copia dependências
+# Copia dependências e baixa
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copia o código
+# Copia o código fonte
 COPY . .
 
 # Compila o binário estático
-# CGO_ENABLED=0 é vital para rodar no Alpine
+# CGO_ENABLED=0 garante compatibilidade total com Alpine
 RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 
-# --- Estágio 2: Rodar ---
+# --- Estágio 2: Runtime (Imagem Leve) ---
 FROM alpine:latest
 
 WORKDIR /app
 
-# Copia o executável especificamente para /app/main
-COPY --from=builder /app/main /app/main
-COPY --from=builder /app/.env /app/.env
+# 1. Instala o tzdata para corrigir o horário (Timezone)
+# Como é uma imagem Alpine, usamos apk
+RUN apk add --no-cache tzdata
 
-# Dá permissão de execução (garantia extra)
-RUN chmod +x /app/main
+# 2. Copia o binário compilado do estágio anterior
+COPY --from=builder /app/main .
 
-# Comandos de execução usando CAMINHO ABSOLUTO
-# Isso evita o erro "file not found"
-CMD ["/app/main"]
+# 3. Copia o arquivo .env (caso seu código Go tente ler o arquivo explicitamente)
+COPY --from=builder /app/.env .
+
+# 4. Comando de execução
+CMD ["./main"]
