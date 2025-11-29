@@ -101,7 +101,7 @@ export class WeatherService {
           "alert": "Algum alerta? (Calor, Frio, Chuva, Vento) ou 'Normal'",
           "recommendation": "Dica curta para a pessoa (Ex: Beber água, levar guarda-chuva)",
            "temperature_next_hour": "Tendencia de temperatura para coleção em °C. Use apenas número exemplo '25.4'. Dê preferencia para o ultimo valor da coleção",
-          "predicted_weather_next_hour": "Previsão do tempo para a próxima hora informando humidade e vento em uma frase curta"
+          "predicted_weather_next_hour": "Previsão do tempo para a próxima hora informando humidade (valor ex: '65%') e vento (valor ex: '12 km/h') em uma frase curta"
         }
       `;
 
