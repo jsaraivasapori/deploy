@@ -100,7 +100,7 @@ export class WeatherService {
           "summary": "Resumo da tendência climática em uma frase curta (Português)",
           "alert": "Algum alerta? (Calor, Frio, Chuva, Vento) ou 'Normal'",
           "recommendation": "Dica curta para a pessoa (Ex: Beber água, levar guarda-chuva)",
-           "temperature_next_hour": "Tendencia de temperatura para coleção em °C",
+           "temperature_next_hour": "Tendencia de temperatura para coleção em °C. Use apenas número exemplo '25.4'. Dê preferencia para o valor de maior frequencia",
           "predicted_weather_next_hour": "Previsão do tempo para a próxima hora informando humidade e vento em uma frase curta"
         }
       `;
@@ -108,7 +108,7 @@ export class WeatherService {
       const result = await model.generateContent(prompt);
       const response = result.response;
       const aiJson = JSON.parse(response.text());
-      this.logger.log('Resposta da IA:', aiJson);
+      console.log('Resposta da IA:', aiJson);
 
       return {
         source: 'Google Gemini 2.5 Flash',
