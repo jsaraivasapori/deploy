@@ -1,9 +1,3 @@
-﻿# 🚀 Guia de Deploy: Arquitetura Microservices (Go, Python, NestJS, React)
-
-Este guia cobre a implantação da aplicação utilizando **Docker Compose** e **Nginx (Proxy Reverso)** em uma VPS Linux (Ubuntu/Debian).
-
----
-
 # 🚀 Guia de Deploy: Arquitetura Microservices (Go, Python, NestJS, React)
 
 Este guia cobre a instalação do ambiente e a implantação da aplicação utilizando **Docker Compose** e **Nginx (Proxy Reverso)** em uma VPS Linux (Ubuntu/Debian).
