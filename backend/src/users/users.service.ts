@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
   OnModuleInit,
+  Inject,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -12,6 +13,8 @@ import { User, UserDocument } from './entities/user.entity';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -19,6 +22,7 @@ export class UsersService implements OnModuleInit {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private configService: ConfigService,
   ) {}
 
@@ -39,6 +43,8 @@ export class UsersService implements OnModuleInit {
       }
     }
   }
+
+  // Criação com invalidação de cache
   async create(createUserDto: CreateUserDto): Promise<User> {
     const { email, password, role } = createUserDto;
 
@@ -56,7 +62,10 @@ export class UsersService implements OnModuleInit {
       role,
     });
 
-    return newUser.save();
+    const savedUser = await newUser.save();
+    await this.cacheManager.clear(); // Invalida o cache
+
+    return savedUser;
   }
 
   async findAll(): Promise<User[]> {
@@ -106,6 +115,8 @@ export class UsersService implements OnModuleInit {
       throw new NotFoundException(`Usuário com ID ${id} não encontrado`);
     }
 
+    await this.cacheManager.clear(); // Invalida o cache para refletir mudanças
+
     return updatedUser;
   }
 
@@ -116,6 +127,8 @@ export class UsersService implements OnModuleInit {
     if (!deletedUser) {
       throw new NotFoundException(`Usuário com ID ${id} não encontrado.`);
     }
+
+    await this.cacheManager.clear(); // Invalida o cache para refletir mudanças
 
     return deletedUser;
   }
