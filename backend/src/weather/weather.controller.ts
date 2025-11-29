@@ -6,6 +6,7 @@ import {
   UseGuards,
   Res,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -13,6 +14,7 @@ import { ApiBearerAuth, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WeatherService } from './weather.service';
 import { CreateWeatherDto } from './dto/create-weather.dto';
 import { WeatherResponseDto } from './dto/weather-response.dto';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 
 @ApiTags('Weather') // Organiza no Swagger
 @Controller('weather') // Prefixo /api/v1/weather
@@ -28,6 +30,8 @@ export class WeatherController {
   // --- ROTA DE LISTAGEM PAGINADA (Frontend) ---
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(30 * 1000) // Define 30s de vida para essa rota específica
   @Get('logs')
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiResponse({
@@ -39,12 +43,16 @@ export class WeatherController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
   ) {
+    // O Cache Manager usa a URL (ex: "/weather/logs?page=1") como chave.
+    // Se o usuário pedir a página 2, gera uma nova entrada no cache automaticamente.
     return this.weatherService.findAll(Number(page), 10);
   }
 
   // --- INSIGHTS DE IA ---
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
+  @UseInterceptors(CacheInterceptor) // <--- LIGA O CACHE
+  @CacheTTL(900 * 1000) // 15 minutos de cache para insights
   @Get('insights')
   async getInsights() {
     return this.weatherService.generateInsights();

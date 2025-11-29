@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -9,6 +9,8 @@ import { Parser } from 'json2csv';
 import { CreateWeatherDto } from './dto/create-weather.dto';
 import { Weather, WeatherDocument } from './entities/weather.entity';
 import { WeatherResponseDto } from './dto/weather-response.dto';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class WeatherService {
@@ -17,6 +19,7 @@ export class WeatherService {
 
   constructor(
     @InjectModel(Weather.name) private weatherModel: Model<WeatherDocument>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private configService: ConfigService,
   ) {
     // Busca a chave no .env (Gerada no Google AI Studio, independente do seu plano pessoal)
@@ -34,8 +37,10 @@ export class WeatherService {
   // --- 1. RECEBER DADOS DO GO ---
   async create(createWeatherDto: CreateWeatherDto): Promise<Weather> {
     const createdLog = new this.weatherModel(createWeatherDto);
-    // this.logger.log(`Recebido log de clima: ${createWeatherDto.temperature}°C`);
-    return createdLog.save();
+    const savedLog = await createdLog.save();
+    await this.cacheManager.clear();
+
+    return savedLog;
   }
 
   // --- 2. LISTAR DADOS (Paginado ou Geral) ---

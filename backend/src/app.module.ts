@@ -7,6 +7,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
 import { WeatherModule } from './weather/weather.module';
 import { StarWarsModule } from './star-wars/star-wars.module';
+import { CacheModule } from '@nestjs/cache-manager';
 import {
   RegistryLog,
   RegistryLogSchema,
@@ -17,6 +18,12 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    // Configuração do Cache em Memória (RAM)
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 60 * 1000, // 60 segundos de vida padrão
+      max: 100, //  Permite armazenar até 100 páginas/rotas distintas antes de limpar as antigas
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
