@@ -7,7 +7,7 @@ type PrivateRouteProps = {
 };
 
 export function PrivateRoute({ children }: PrivateRouteProps) {
-  const token = localStorage.getItem("authToken");
+  const token = localStorage.getItem("access_token");
 
   return token ? children : <Navigate to="/login" replace />;
 }
