@@ -4,36 +4,16 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
-// Mock do Bcrypt
-jest.mock('bcrypt', () => ({
-  compare: jest.fn(),
-}));
+const mockUsersService = {
+  findOneByEmail: jest.fn(),
+};
+
+const mockJwtService = {
+  sign: jest.fn().mockReturnValue('mock_token'),
+};
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: UsersService;
-  let jwtService: JwtService;
-
-  // Mock do Usuário
-  const mockUser = {
-    _id: 'id_123',
-    email: 'teste@gdash.com',
-    password: 'hash_senha',
-    role: 'user',
-    toObject: jest.fn().mockReturnValue({
-      _id: 'id_123',
-      email: 'teste@gdash.com',
-      role: 'user',
-    }),
-  };
-
-  const mockUsersService = {
-    findOneByEmail: jest.fn(),
-  };
-
-  const mockJwtService = {
-    sign: jest.fn().mockReturnValue('token_gerado_abc'),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -45,9 +25,6 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    usersService = module.get<UsersService>(UsersService);
-    jwtService = module.get<JwtService>(JwtService);
-
     jest.clearAllMocks();
   });
 
@@ -56,57 +33,54 @@ describe('AuthService', () => {
   });
 
   describe('validateUser', () => {
-    it('deve retornar os dados do usuário (sem senha) se as credenciais forem válidas', async () => {
-      jest
-        .spyOn(usersService, 'findOneByEmail')
-        .mockResolvedValue(mockUser as any);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-
-      const result = await service.validateUser('teste@gdash.com', '123456');
-
-      expect(result).toEqual({
-        _id: 'id_123',
-        email: 'teste@gdash.com',
+    it('deve retornar o usuário (sem senha) se a validação for bem sucedida', async () => {
+      const user = {
+        email: 'test@test.com',
+        password: 'hashedPassword',
         role: 'user',
-      });
+      };
+      mockUsersService.findOneByEmail.mockResolvedValue(user);
+
+      // Mock do bcrypt.compare para retornar true
+      jest
+        .spyOn(bcrypt, 'compare')
+        .mockImplementation(() => Promise.resolve(true));
+
+      const result = await service.validateUser('test@test.com', 'correctPass');
+
+      expect(result).toEqual({ email: 'test@test.com', role: 'user' });
       expect(result).not.toHaveProperty('password');
     });
 
-    it('deve retornar null se o usuário não for encontrado', async () => {
-      jest.spyOn(usersService, 'findOneByEmail').mockResolvedValue(null);
-
-      const result = await service.validateUser('errado@gdash.com', '123');
-
-      expect(result).toBeNull();
-    });
-
     it('deve retornar null se a senha estiver incorreta', async () => {
+      const user = { email: 'test@test.com', password: 'hashedPassword' };
+      mockUsersService.findOneByEmail.mockResolvedValue(user);
       jest
-        .spyOn(usersService, 'findOneByEmail')
-        .mockResolvedValue(mockUser as any);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+        .spyOn(bcrypt, 'compare')
+        .mockImplementation(() => Promise.resolve(false));
 
-      const result = await service.validateUser(
-        'teste@gdash.com',
-        'senha_errada',
-      );
-
+      const result = await service.validateUser('test@test.com', 'wrongPass');
       expect(result).toBeNull();
     });
-  }); // <--- FALTAVA FECHAR ESSE BLOCO CORRETAMENTE NO SEU CÓDIGO ANTERIOR
+
+    it('deve retornar null se o usuário não existir', async () => {
+      mockUsersService.findOneByEmail.mockResolvedValue(null);
+      const result = await service.validateUser('ghost@test.com', 'pass');
+      expect(result).toBeNull();
+    });
+  });
 
   describe('login', () => {
-    it('deve retornar um objeto com access_token', async () => {
-      const userPayload = { email: 'teste@a.com', _id: '1', role: 'user' };
+    it('deve retornar o access_token', async () => {
+      const user = { email: 'test@test.com', _id: '1', role: 'admin' };
+      const result = await service.login(user);
 
-      const result = await service.login(userPayload);
-
-      expect(jwtService.sign).toHaveBeenCalledWith({
-        email: userPayload.email,
-        sub: userPayload._id,
-        role: userPayload.role,
+      expect(mockJwtService.sign).toHaveBeenCalledWith({
+        email: user.email,
+        sub: user._id,
+        role: user.role,
       });
-      expect(result).toEqual({ access_token: 'token_gerado_abc' });
+      expect(result).toEqual({ access_token: 'mock_token' });
     });
   });
 });
