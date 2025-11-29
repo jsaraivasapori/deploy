@@ -1,98 +1,99 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🌤️ Backend - Monitoramento Climático & Gestão
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API robusta construída com **NestJS**, seguindo arquitetura modular e padrões de projeto sólidos para suportar uma aplicação de monitoramento climático com IA.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🛠️ Stack Tecnológica
 
-## Description
+- **Framework:** NestJS (Node.js)
+- **Database:** MongoDB (via Mongoose)
+- **Autenticação:** Passport.js + JWT (JSON Web Tokens)
+- **IA Generativa:** Google Gemini 1.5 Flash (via `@google/generative-ai`)
+- **Cache:** Cache Manager (In-Memory)
+- **Documentação:** Swagger (OpenAPI)
+- **Validação:** Class-validator & Class-transformer
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 🏗️ Arquitetura e Padrões
 
-## Project setup
+O projeto segue uma arquitetura modular com **Repository Pattern** para desacoplamento do banco de dados.
 
-```bash
-$ npm install
+### Estrutura de Pastas (Exemplo Modular)
+
+```
+src/
+├── auth/           # Autenticação e Guards
+├── users/          # Gestão de Usuários
+│   ├── repositories/ # Camada de acesso a dados (IUsersRepository)
+│   ├── dto/
+│   └── ...
+├── weather/        # Núcleo de Clima
+│   ├── repositories/ # Camada de acesso a dados (IWeatherRepository)
+│   ├── entities/
+│   └── ...
+└── star-wars/      # Integração externa (SWAPI)
+
 ```
 
-## Compile and run the project
+### Destaques da Implementação
 
-```bash
-# development
-$ npm run start
+1.  **Repository Pattern:**
+    - Os _Services_ não dependem diretamente do Mongoose (`Model<T>`).
+    - Dependem de interfaces (`IUsersRepository`, `IWeatherRepository`).
+    - Facilita testes e troca futura de banco de dados (ex: MongoDB -> PostgreSQL).
 
-# watch mode
-$ npm run start:dev
+2.  **Estratégia de Cache (Cache-Aside):**
+    - **Leitura Rápida:** Rotas `GET` (listagens, insights) são cacheadas na memória (TTL configurável).
+    - **Invalidação Inteligente:** Sempre que um dado é criado (`POST`), atualizado (`PATCH`) ou deletado (`DELETE`), o cache do módulo é invalidado (`.clear()`) para garantir consistência imediata.
 
-# production mode
-$ npm run start:prod
-```
+3.  **Inteligência Artificial (Gemini):**
+    - Analisa os últimos 10 registros climáticos.
+    - Gera insights de texto, alertas e **previsões numéricas** para a próxima hora.
+    - Retorna JSON estruturado garantido via prompt engineering.
 
-## Run tests
+## 🚀 Módulos Principais
 
-```bash
-# unit tests
-$ npm run test
+### 1. Auth Module
 
-# e2e tests
-$ npm run test:e2e
+- Login seguro com comparação de hash (bcrypt).
+- Emissão de Token JWT com Payloads customizados (`sub`, `role`).
 
-# test coverage
-$ npm run test:cov
-```
+### 2. Users Module (CRUD)
 
-## Deployment
+- Criação de usuários (Admin/User).
+- Listagem e Edição.
+- **Regra de Negócio:** Impede duplicação de e-mail e garante hash de senha antes de salvar.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### 3. Weather Module
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- **Ingestão:** Recebe dados de coletores externos (Go/Python).
+- **Análise:** Endpoint `/insights` consome a API do Gemini.
+- **Exportação:** Gera relatórios `.csv` e `.xlsx` sob demanda usando Streams.
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+### 4. Star Wars Module
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- Proxy para a SWAPI (Star Wars API).
+- Encapsula a lógica de fetch externa para evitar CORS no frontend.
 
-## Resources
+## 📦 Como Rodar
 
-Check out a few resources that may come in handy when working with NestJS:
+1.  Configure o `.env`:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+    ```
+    # Porta da API (Interna do container)
+    PORT=3000
 
-## Support
+    # Conexão com o MongoDB
+    MONGO_URI=mongodb://mongo:27017/gdash
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+    # Conexão com RabbitMQ
 
-## Stay in touch
+    RABBITMQ_URI=amqp://user:password@rabbitmq:5672
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+    # Segredos e Chaves
+    JWT_SECRET=SegredoSuperSecretoDoGdash123
+    GEMINI_API_KEY=AIzaSyC2I9TNbGsSXdW-0GCSyFBAn6hQ371a3-g #ou gere a sua. se for exporta e preciso gerar outra
 
-## License
+    # Admin Padrão
+    DEFAULT_ADMIN_EMAIL=admin@gdash.com
+    DEFAULT_ADMIN_PASSWORD=admin1234
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+    ```
