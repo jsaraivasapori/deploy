@@ -13,9 +13,11 @@ export class AuthService {
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.usersService.findOneByEmail(email);
 
+    if (!user) return null;
+
     // Compara a senha digitada com o hash do banco
     if (user && (await bcrypt.compare(pass, user.password))) {
-      const { password, ...result } = user.toObject();
+      const { password, ...result } = user;
       return result; // remove a senha antes de retornar
     }
     return null;
