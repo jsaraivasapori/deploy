@@ -17,10 +17,9 @@ export class WeatherService {
 
   constructor(
     @Inject('IWeatherRepository')
-    @Inject(CACHE_MANAGER)
-    private cacheManager: Cache,
     private readonly weatherRepository: IWeatherRepository,
     private configService: ConfigService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     // Busca a chave no .env (Gerada no Google AI Studio, independente do seu plano pessoal)
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
