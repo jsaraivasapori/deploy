@@ -3,13 +3,19 @@ import { WeatherService } from './weather.service';
 import { WeatherController } from './weather.controller';
 import { Weather, WeatherSchema } from './entities/weather.entity';
 import { MongooseModule } from '@nestjs/mongoose';
+import { WeatherMongoRepository } from './repositories/weather.mongo.repository';
 
 @Module({
   imports: [
-    // Ensina ao Módulo que a coleção 'weather' existe
     MongooseModule.forFeature([{ name: Weather.name, schema: WeatherSchema }]),
   ],
   controllers: [WeatherController],
-  providers: [WeatherService],
+  providers: [
+    WeatherService,
+    {
+      provide: 'IWeatherRepository',
+      useClass: WeatherMongoRepository,
+    },
+  ],
 })
 export class WeatherModule {}

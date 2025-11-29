@@ -1,16 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as XLSX from 'xlsx';
 import { Parser } from 'json2csv';
-
 import { CreateWeatherDto } from './dto/create-weather.dto';
-import { Weather, WeatherDocument } from './entities/weather.entity';
+import { Weather } from './entities/weather.entity';
 import { WeatherResponseDto } from './dto/weather-response.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { IWeatherRepository } from './repositories/weather.repository.interface';
 
 @Injectable()
 export class WeatherService {
@@ -18,8 +16,10 @@ export class WeatherService {
   private readonly logger = new Logger(WeatherService.name);
 
   constructor(
-    @InjectModel(Weather.name) private weatherModel: Model<WeatherDocument>,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @Inject('IWeatherRepository')
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
+    private readonly weatherRepository: IWeatherRepository,
     private configService: ConfigService,
   ) {
     // Busca a chave no .env (Gerada no Google AI Studio, independente do seu plano pessoal)
@@ -36,11 +36,13 @@ export class WeatherService {
 
   // --- 1. RECEBER DADOS DO GO ---
   async create(createWeatherDto: CreateWeatherDto): Promise<Weather> {
-    const createdLog = new this.weatherModel(createWeatherDto);
-    const savedLog = await createdLog.save();
+    const savedWeatherDataLog =
+      await this.weatherRepository.create(createWeatherDto);
+
+    // Limpa o cache para garantir dados atualizados
     await this.cacheManager.clear();
 
-    return savedLog;
+    return savedWeatherDataLog;
   }
 
   // --- 2. LISTAR DADOS (Paginado ou Geral) ---
@@ -51,14 +53,7 @@ export class WeatherService {
   ): Promise<WeatherResponseDto> {
     const skip = (page - 1) * limit;
 
-    const data = await this.weatherModel
-      .find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this.weatherModel.countDocuments();
+    const { data, total } = await this.weatherRepository.findAll(skip, limit);
 
     return {
       data,
@@ -71,14 +66,9 @@ export class WeatherService {
   // --- 3. GERAR INSIGHTS COM IA ---
   async generateInsights() {
     // Busca os últimos 10 registros para contexto
-    const weatherData = await this.weatherModel
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean()
-      .exec();
+    const weatherDataLog = await this.weatherRepository.findLatest(10);
 
-    if (!weatherData.length)
+    if (!weatherDataLog.length)
       return { message: 'Dados insuficientes para análise.' };
 
     if (!this.genAIApi) {
@@ -94,7 +84,7 @@ export class WeatherService {
 
       // Prepara os dados para a IA ler
       const dataContext = JSON.stringify(
-        weatherData.map((l) => ({
+        weatherDataLog.map((l) => ({
           temp: l.temperature,
           hum: l.humidity,
           wind: l.wind_speed,
@@ -123,7 +113,7 @@ export class WeatherService {
         source: 'Google Gemini 2.5 Flash',
         analysis_date: new Date(),
         ...aiJson,
-        raw_data_samples: weatherData.length,
+        raw_data_samples: weatherDataLog.length,
       };
     } catch (error) {
       this.logger.error('Erro ao chamar Gemini', error);
@@ -137,14 +127,9 @@ export class WeatherService {
 
   // --- 4. GERAR CSV ---
   async generateCsv(): Promise<string> {
-    const logs = await this.weatherModel
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(1000) // Limite de segurança
-      .lean()
-      .exec();
+    const dataWeatherLogs = await this.weatherRepository.findAllForExport(2000); // Ajuste conforme necessário
 
-    if (!logs.length) return '';
+    if (!dataWeatherLogs.length) return '';
 
     const fields = [
       'location_lat',
@@ -157,20 +142,17 @@ export class WeatherService {
     ];
 
     const parser = new Parser({ fields });
-    return parser.parse(logs);
+    return parser.parse(dataWeatherLogs);
   }
 
   // --- 5. GERAR EXCEL (XLSX) ---
   async generateXlsx(): Promise<Buffer> {
-    const logs = await this.weatherModel
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(1000)
-      .lean()
-      .exec();
+    const dataWeatherLogs = await this.weatherRepository.findAllForExport(2000); // Ajuste conforme necessário
+
+    if (!dataWeatherLogs.length) return Buffer.from([]);
 
     // Cria a planilha
-    const worksheet = XLSX.utils.json_to_sheet(logs);
+    const worksheet = XLSX.utils.json_to_sheet(dataWeatherLogs);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Dados Climáticos');
 
