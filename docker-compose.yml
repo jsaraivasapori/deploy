@@ -1,43 +1,28 @@
 version: "3.8"
 
 services:
-  # ----------------------------------------------------------------
-  # INFRAESTRUTURA (Blindada 🔒)
-  # ----------------------------------------------------------------
-
-  mongo:
-    image: mongo:latest
-    container_name: app_mongo
+  # --- O NOVO CHEFÃO DA REDE ---
+  nginx:
+    image: nginx:alpine
+    container_name: app_proxy
     restart: always
-    # 🔒 SEGURANÇA: Portas removidas para evitar acesso externo
-    # O acesso continua funcionando internamente via 'app_network'
+    ports:
+      - "80:80" # Única porta aberta pro mundo!
     volumes:
-      - mongo_data:/data/db
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
     networks:
       - app_network
 
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: app_rabbitmq
-    restart: always
-    # 🔒 SEGURANÇA: Portas removidas.
-    # O painel de gestão (15672) não ficará acessível publicamente (use túnel SSH se precisar ver)
-    environment:
-      - RABBITMQ_DEFAULT_USER=admin
-      - RABBITMQ_DEFAULT_PASS=admin
-    networks:
-      - app_network
-
-  # ----------------------------------------------------------------
-  # APLICAÇÕES
-  # ----------------------------------------------------------------
+  # --- APLICAÇÕES (Agora escondidas atrás do proxy) ---
 
   backend:
     build: ./backend
     container_name: app_backend
-    restart: always # Mudado para sempre reiniciar se cair
-    ports:
-      - "3000:3000" # Aberto para receber requisições do Frontend
+    restart: always
+    # ports: REMOVIDO! Ninguém acessa a 3000 direto mais
     env_file:
       - ./backend/.env
     depends_on:
@@ -50,11 +35,30 @@ services:
     build: ./frontend
     container_name: app_frontend
     restart: always
-    ports:
-      - "5173:5173" # Aberto para o usuário acessar o site
+    # ports: REMOVIDO! Ninguém acessa a 5173 direto mais
     env_file:
       - ./frontend/.env
-    # 🚀 PERFORMANCE: Removido CHOKIDAR (desnecessário em produção Linux)
+    networks:
+      - app_network
+
+  # --- INFRA E WORKERS (Mantém igual) ---
+
+  mongo:
+    image: mongo:latest
+    container_name: app_mongo
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: app_rabbitmq
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
     networks:
       - app_network
 
@@ -81,9 +85,6 @@ services:
     networks:
       - app_network
 
-# ----------------------------------------------------------------
-# VOLUMES E REDES
-# ----------------------------------------------------------------
 volumes:
   mongo_data:
 
