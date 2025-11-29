@@ -6,7 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://34.122.109.191:5173'], // O endereço exato do seu Frontend
+    origin: ['http://localhost:5173', 'http://34.122.109.191'], // O endereço exato do seu Frontend
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true, // Importante se você usa Cookies ou Headers de Autorização
   });
@@ -29,7 +29,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/v1/docs', app, document);
   // -------------------------------
-  
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
