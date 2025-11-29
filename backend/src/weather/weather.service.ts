@@ -9,6 +9,7 @@ import { WeatherResponseDto } from './dto/weather-response.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { IWeatherRepository } from './repositories/weather.repository.interface';
+import { log } from 'console';
 
 @Injectable()
 export class WeatherService {
@@ -107,6 +108,7 @@ export class WeatherService {
       const result = await model.generateContent(prompt);
       const response = result.response;
       const aiJson = JSON.parse(response.text());
+      this.logger.log('Resposta da IA:', aiJson);
 
       return {
         source: 'Google Gemini 2.5 Flash',
