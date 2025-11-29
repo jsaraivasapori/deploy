@@ -16,26 +16,65 @@ Este guia cobre a implantação da aplicação utilizando **Docker Compose** e *
 
 Certifique-se de que sua VPS tenha esta estrutura exata:
 
-    /seu-projeto
+     /seu-projeto
     ├── docker-compose.yml
     ├── nginx/
-    │   └── nginx.conf
-    ├── backend/       (NestJS + Dockerfile + .env)
-    ├── frontend/      (Vite + Dockerfile + .env)
-    ├── collector/     (Python + Dockerfile + .env)
-    └── worker/        (Go + Dockerfile + .env)
+    │   └── nginx.conf          (Proxy Principal)
+    ├── backend/
+    │   ├── Dockerfile
+    │   └── .env
+    ├── frontend/
+    │   ├── Dockerfile          (Multi-Stage: Node -> Nginx)
+    │   ├── nginx-custom.conf   (Config interna do SPA)
+    │   └── .env
+    ├── collector/ ...
+    └── worker/ ...
 
-## 2. Configuração do Proxy (Nginx)
+## 2. Configuração do Frontend
 
-Crie o arquivo `nginx/nginx.conf`. Ele redireciona a porta 80 para o Front e Back.
+Para performance, não usamos o Vite Dev Server na VPS. Usamos um **Nginx interno** para servir os arquivos estáticos compilados.
+
+    # Estágio 1: Build (Compilação)
+    FROM node:20-alpine AS builder
+    WORKDIR /app
+    COPY package*.json ./
+    RUN npm install
+    COPY . .
+    RUN npm run build
+
+    # Estágio 2: Servidor Leve (Produção)
+    FROM nginx:alpine
+    RUN rm /etc/nginx/conf.d/default.conf
+    COPY --from=builder /app/dist /usr/share/nginx/html
+    COPY nginx-custom.conf /etc/nginx/conf.d/default.conf
+    EXPOSE 80
+    CMD ["nginx", "-g", "daemon off;"]
+
+📄 `frontend/nginx-custom.conf` (Crie este arquivo!)
+Necessário para o React (SPA) não dar erro 404 ao atualizar a página.
 
     server {
     listen 80;
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+}
+
+## 3. Configuração do Proxy Principal
+
+O Proxy é quem recebe as requisições da internet. Arquivo: `nginx/nginx.conf`
+
+        server {
+    listen 80;
     server_name localhost;
 
-    # Frontend (Vite)
+    # Frontend (Agora aponta para a porta 80 interna)
     location / {
-        proxy_pass http://frontend:5173;
+        proxy_pass http://frontend:80;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -55,20 +94,20 @@ Crie o arquivo `nginx/nginx.conf`. Ele redireciona a porta 80 para o Front e Bac
 
 }
 
-## 3. Orquestração (Docker Compose)
+## 4. Orquestração (docker-compose.yml)
 
-Arquivo `docker-compose.yml` configurado para produção (portas fechadas, apenas Nginx exposto).
+Versão final blindada. Apenas o Proxy tem porta aberta.
 
-        version: '3.8'
+     version: '3.8'
 
     services:
-      # --- Proxy Reverso (A única porta aberta) ---
+      # --- Proxy Reverso (Porta de Entrada) ---
       nginx:
         image: nginx:alpine
         container_name: app_proxy
         restart: always
         ports:
-          - "80:80"
+          - "80:80" # ÚNICA porta aberta para o mundo
         volumes:
           - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
         depends_on:
@@ -78,19 +117,21 @@ Arquivo `docker-compose.yml` configurado para produção (portas fechadas, apena
           - app_network
 
       # --- Aplicações ---
+
+      frontend:
+        build: ./frontend
+        container_name: app_frontend
+        restart: always
+        # SEM PORTAS EXPOSTAS (O Proxy acessa internamente)
+        env_file: ./frontend/.env
+        networks: [app_network]
+
       backend:
         build: ./backend
         container_name: app_backend
         restart: always
         env_file: ./backend/.env
         depends_on: [mongo, rabbitmq]
-        networks: [app_network]
-
-      frontend:
-        build: ./frontend
-        container_name: app_frontend
-        restart: always
-        env_file: ./frontend/.env
         networks: [app_network]
 
       collector:
@@ -109,7 +150,8 @@ Arquivo `docker-compose.yml` configurado para produção (portas fechadas, apena
         depends_on: [rabbitmq, backend]
         networks: [app_network]
 
-      # --- Infraestrutura ---
+      # --- Infraestrutura (Banco e Fila) ---
+
       mongo:
         image: mongo:latest
         container_name: app_mongo
@@ -133,82 +175,66 @@ Arquivo `docker-compose.yml` configurado para produção (portas fechadas, apena
       app_network:
         driver: bridge
 
+## 5. Variáveis de Ambiente
 
-## 4. Variáveis de Ambiente
+Crie os arquivos manualmente na VPS (`nano pasta/.env`).
 
-Você deve criar os arquivos `.env` manualmente na VPS (`nano pasta/.env`), pois eles não sobem via Git.
+**📄 `frontend/.env`**
 
-📄 `frontend/.env`
-Como usamos Nginx, usamos caminho relativo (a API responde no mesmo domínio).
+     #Caminho relativo (o Proxy resolve)
+     VITE_BACKEND_API_URL=/api/v1
+     VITE_AUTO_REFRESH_INTERVAL=3600000 # 1 horas | ajuse conforme a necessidade em ms.
 
-    # Não use localhost nem IP. Use apenas o caminho relativo por causa da implementação do proxyreverso.
-
-VITE_BACKEND_API_URL=/api/v1
-VITE_AUTO_REFRESH_INTERVAL=3600000 (1 hora / 3600 segundos)
-
-📄 `backend/.env`
-O backend fala com a infra pelos nomes dos containers.
+**📄 `backend/.env`**
 
     PORT=3000
     MONGO_URI=mongodb://mongo:27017/gdash
     RABBITMQ_URI=amqp://admin:admin@rabbitmq:5672
     GEMINI_API_KEY=SUA_CHAVE_AQUI
-    # Ajuste o CORS para aceitar o IP da VPS ou '*', porém evite essa última opção.
+    # DICA: Se usar Nginx, pode aceitar qualquer origem ou o IP da VPS
+    # CORS_ORIGIN=* ```
 
-📄 `worker/.env`
-O Worker fala direto com o Backend (bypass no Nginx, rede interna).
+**📄 worker/.env**
 
     RABBITMQ_URL=amqp://admin:admin@rabbitmq:5672/
-    QUEUE_NAME=weather_data
-    API_URL=http://backend:3000/api/v1/weather/logs
+    QUEUE_NAME=weather_data API_URL=http://backend:3000/api/v1/weather/logs
 
-📄 `collector/.env`
+**📄 `collector/.env`**
 
     LATITUDE=-16.4341
     LONGITUDE=-43.5154
-    COLLECT_INTERVAL= 900 # (15 minutos) mude conforme necessidade
+    COLLECT_INTERVAL= 900 # 15 minutos | ajuste conforme necessidade em segundos.
     RABBITMQ_HOST=rabbitmq
     RABBITMQ_PORT=5672
     RABBITMQ_USER=admin
     RABBITMQ_PASS=admin
     QUEUE_NAME=weather_data
 
-## 5. Checklist de Firewall VPS / Cloud
+## 6. Operação e Firewall
 
-Configure o Firewall da sua nuvem para aceitar tráfego **APENAS** nestas portas:
-|TCP | Porta | Finalidade|
-|--|--|--|
-| TCP | 80 |HTTP (Acesso ao Site/API) |
-|TCP|443|HTTPS (Futuro SSL)|
-|TCP| 22 |SSH (Seu acesso administrativo)|
+### Firewall (Cloud)
 
-🔴 **Bloqueie:** 3000, 5173, 27017, 5672, 15672 (Acesso externo proibido).
+Libere **APENAS**:
 
-## 6. Comandos de Operação
+- TCP 80 (HTTP)
+- TCP 443 (HTTPS)
+- TCP 22 (SSH)
 
-Iniciar / Atualizar tudo:
+**Comandos Úteis**
 
-    Bash
+    # Subir tudo (reconstruindo imagens)
     docker compose up -d --build
 
-Atualizar apenas um serviço (ex: Backend):
-
-    Bash
-    docker compose up -d --build backend
-
-Ver Logs (Debug):
-
-    Bash
-
-    # Ver tudo
+    # Ver logs
     docker compose logs -f
 
-    # Ver logs específicos (ex: Nginx e Backend)
-    docker compose logs -f nginx backend
-
-Limpeza (Se o disco encher):
-
-    Bash
+    # Limpar espaço em disco
     docker system prune -f
 
-**Dica Extra:** Se precisar acessar o MongoDB ou RabbitMQ visualmente, não abra as portas na nuvem! Use um **Túnel SSH** na sua máquina local: `ssh -L 27017:localhost:27017 usuario@ip-da-vps`
+## 7. Acessando a Aplicação
+
+Basta acessar `http://SEU_IP_DA_VPS` (sem porta).
+
+## 8. Dica Extra
+
+Se precisar acessar o MongoDB ou RabbitMQ visualmente, não abra as portas na nuvem! Use um **Túnel SSH** na sua máquina local: `ssh -L 27017:localhost:27017 usuario@ip-da-vps`
