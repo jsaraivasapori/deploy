@@ -1,73 +1,97 @@
-# React + TypeScript + Vite
+# 🖥️ Frontend - Dashboard Climático & Gestão
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interface moderna, responsiva e de alto desempenho construída com **React 18+**, focada na visualização de dados em tempo real e numa experiência de utilizador fluida.
 
-Currently, two official plugins are available:
+## 🎨 Stack Tecnológica
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Core:** React 18+ (Vite)
+- **Linguagem:** TypeScript
+- **Estilização:** TailwindCSS v4
+- **Componentes UI:** Shadcn/ui (Radix Primitives)
+- **Gráficos:** Recharts
+- **Ícones:** Lucide React
+- **HTTP Client:** Axios (com Interceptors)
+- **Feedback:** Sonner (Toasts)
+- **Gestão de Formulários:** React Hook Form + Zod
 
-## React Compiler
+## 🧩 Arquitetura do Frontend
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+O projeto utiliza o padrão de **Custom Hooks** para separar completamente a lógica de negócio da camada de apresentação (View/JSX).
 
-## Expanding the ESLint configuration
+### Estrutura de Diretórios
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```
+src/
+├── components/
+│   ├── ui/             # Componentes base do Shadcn (Button, Card, Input...)
+│   └── ...
+├── layouts/            # Layouts globais (MainLayout com Sidebar e Header)
+├── lib/                # Configurações globais (Axios instance, Utils)
+├── pages/
+│   ├── Dashboard/
+│   │   ├── components/ # Componentes exclusivos (Charts, Tables, Cards)
+│   │   ├── hooks/      # useDashboard.ts (Toda a lógica e estado)
+│   │   └── Dashboard.tsx (Apenas JSX/Visual)
+│   ├── Users/
+│   │   ├── components/ # Modais e Tabelas modulares
+│   │   ├── hooks/      # useUsers.ts (Lógica de CRUD e Filtros)
+│   │   └── UsersManager.tsx
+│   ├── StarWars/       # Integração com API externa
+│   │   └── ...
+│   └── Login/
+└── services/           # Camada de API (Axios calls para o Backend NestJS)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## ✨ Funcionalidades Principais
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 1. Dashboard Inteligente (`/`)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- **Visualização de Dados:** Gráficos interativos alternáveis entre Temperatura, Umidade, Vento e Probabilidade de Chuva.
+- **AI Insights Card:** Exibe análises geradas pelo Gemini com destaque visual para a previsão numérica da próxima hora.
+- **Auto-Refresh:** Atualização automática dos dados a cada 30 minutos, com opção de atualização manual instantânea.
+- **Exportação:** Download direto de relatórios em `.csv` e `.xlsx`.
+
+### 2. Gestão de Usuários (CRUD) (`/users`)
+
+- **Filtragem Client-Side:** Busca instantânea e reativa por texto (e-mail), permissão (role) e data de criação.
+- **Modais Modulares:** Formulários de criação/edição (`UserFormDialog`) e confirmação de exclusão (`UserDeleteDialog`) segregados para limpeza de código.
+- **Validação Robusta:** Zod schema validation que adapta regras dinamicamente (ex: senha obrigatória na criação, opcional na edição).
+
+### 3. Integração Externa (`/star-wars`)
+
+- Consumo de API externa (SWAPI) via proxy do backend.
+- Paginação server-side e modal de detalhes reutilizável.
+
+## 🔧 Componentes de Destaque
+
+### `RainChart.tsx`
+
+Gráfico de área customizado com gradiente `cyan`, utilizando `recharts` e tooltip personalizado para visualizar a probabilidade de chuva.
+
+### `AiInsightCard.tsx`
+
+Componente inteligente que gerencia múltiplos estados visuais:
+
+- **Loading:** Skeleton UI com animação pulsante.
+- **Empty:** Estado amigável quando não há dados suficientes.
+- **Data:** Exibe temperatura prevista com formatação numérica (`toFixed`) e alertas contextuais.
+
+### `useUsers.ts` (Custom Hook)
+
+Centraliza toda a complexidade da página de gestão:
+
+- Estado da lista e do loading.
+- Lógica de filtragem combinada (Search + Role + Date).
+- Controle de abertura/fechamento de modais.
+- Funções de CRUD (Create, Update, Delete) com feedback visual (Toasts).
+
+## 📦 Como Rodar
+
+2.  Configure as variáveis de ambiente (`.env`):
+
+    ```
+    VITE_BACKEND_API_URL=/api/v1
+      VITE_AUTO_REFRESH_INTERVAL=1800000 # 30 minutos em milissegundos
+
+    ```
