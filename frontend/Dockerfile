@@ -1,20 +1,28 @@
-# 1. Base image (mesma versão do back para consistência)
-FROM node:20-alpine
+# --- Etapa 1: Build (Usando Node 20) ---
+FROM node:20-alpine AS builder
 
-
-# 2. Diretório de trabalho
 WORKDIR /app
 
-# 3. Instala dependências
+# Copia e instala dependências
 COPY package*.json ./
 RUN npm install
 
-# 4. Copia o código fonte
+# Copia o código e gera a build de produção (pasta /dist)
 COPY . .
+RUN npm run build
 
-# 5. Expõe a porta padrão do Vite
-EXPOSE 5173
+# --- Etapa 2: Servidor de Produção (Nginx) ---
+FROM nginx:alpine
 
-# 6. Roda em modo desenvolvimento
-# O parâmetro '--host' é OBRIGATÓRIO para acessar via navegador fora do Docker
-CMD ["npm", "run", "dev", "--", "--host"]
+# Remove a config padrão do Nginx
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copia os arquivos estáticos gerados na etapa anterior
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copia a nossa configuração customizada (criaremos no próximo passo)
+COPY nginx-custom.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
