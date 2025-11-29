@@ -4,6 +4,14 @@ Este guia cobre a implantação da aplicação utilizando **Docker Compose** e *
 
 ---
 
+## 0. Instalação do Docker (VPS Nova) Se a sua VPS acabou de ser criada, rode estes comandos para instalar o Docker Engine e o Plugin do Compose atualizados.
+
+    # 1. Atualize os pacotes do sistema sudo apt update && sudo apt upgrade -y
+    # 2. Instale o Docker usando o script oficial de conveniência curl -fsSL [https://get.docker.com](https://get.docker.com) -o get-docker.sh sudo sh get-docker.sh
+    # 3. Adicione seu usuário ao grupo do Docker (Para não precisar usar 'sudo' sempre) sudo usermod -aG docker $USER
+    # 4. Ative as alterações de grupo (Ou deslogue e logue novamente) newgrp docker
+    # 5. Teste se instalou corretamente docker compose version # Deve retornar algo como: Docker Compose version v2.x.x
+
 ## 1. Estrutura de Pastas Necessária
 
 Certifique-se de que sua VPS tenha esta estrutura exata:
@@ -124,6 +132,7 @@ Arquivo `docker-compose.yml` configurado para produção (portas fechadas, apena
     networks:
       app_network:
         driver: bridge
+
 
 ## 4. Variáveis de Ambiente
 
