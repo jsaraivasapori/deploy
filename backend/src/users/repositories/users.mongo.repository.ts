@@ -27,7 +27,11 @@ export class UsersMongoRepository implements IUsersRepository {
 
   async findByEmail(email: string): Promise<User | null> {
     // .select('+password') é específico do Mongoose usado para incluir campos que são excluídos por padrão
-    return this.userModel.findOne({ email }).select('+password').exec();
+    return this.userModel
+      .findOne({ email })
+      .select('+password')
+      .lean()
+      .exec() as unknown as User;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User | null> {
