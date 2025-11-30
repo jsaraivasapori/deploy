@@ -18,6 +18,8 @@ export class AuthService {
     // Compara a senha digitada com o hash do banco
     if (user && (await bcrypt.compare(pass, user.password))) {
       const { password, ...result } = user;
+      console.log(result);
+
       return result; // remove a senha antes de retornar
     }
     return null;
