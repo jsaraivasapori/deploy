@@ -7,8 +7,9 @@ API robusta construída com **NestJS**, seguindo arquitetura modular e padrões 
 - **Framework:** NestJS (Node.js)
 - **Database:** MongoDB (via Mongoose)
 - **Autenticação:** Passport.js + JWT (JSON Web Tokens)
-- **IA Generativa:** Google Gemini 1.5 Flash (via `@google/generative-ai`)
+- **IA Generativa:** Google Gemini 2.5 Flash (via `@google/generative-ai`)
 - **Cache:** Cache Manager (In-Memory)
+- **System Logs:** Log personalizado via interceptor com salvamento no Mongo - Retenção de 7 dias
 - **Testes:** Jest (Unitários & Mocks)
 - **Documentação:** Swagger (OpenAPI)
 - **Validação:** Class-validator & Class-transformer
@@ -21,15 +22,31 @@ O projeto segue uma arquitetura modular com **Repository Pattern** para desacopl
 
 ```
 src/
-├── auth/           # Autenticação e Guards
-├── users/          # Gestão de Usuários
-│   ├── repositories/ # Camada de acesso a dados (IUsersRepository)
-│   ├── tests/        # Testes unitários do módulo
+├── auth/                       # Módulo de Autenticação e Segurança
+│   ├── dto/                    # Validação de dados de entrada (Login, Register)
+│   ├── strategies/             # Estratégias de autenticação (ex: JWT, Local Strategy)
+│   ├── auth.controller.ts      # Rotas de autenticação
 │   └── ...
-├── weather/        # Núcleo de Clima
-│   ├── repositories/ # Camada de acesso a dados (IWeatherRepository)
+├── common/                     # Recursos compartilhados globalmente
+│   ├── middleware/             # Interceptadores de requisição - Salvamento do Log do sistema no Mongo
+│   └── schemas/                # Schemas de dados compartilhados
+├── star-wars/                  # Módulo de Integração Star Wars
+│   ├── star-wars.service.ts    # Lógica de negócio / Chamadas de API externa
 │   └── ...
-└── star-wars/      # Integração externa (SWAPI)
+├── users/                      # Módulo de Gestão de Usuários
+│   ├── dto/                    # DTOs para CreateUser, UpdateUser
+│   ├── entities/               # Definição das entidades do Banco de Dados
+│   ├── repositories/           # Abstração de acesso ao banco (Repository Pattern)
+│   └── ...
+├── weather/                    # Módulo de Clima (Domínio Principal)
+│   ├── dto/                    # DTOs relacionados a previsão/clima
+│   ├── entities/               # Entidades de Clima
+│   ├── repositories/           # Implementação do Repository Pattern
+│   │   ├── weather.mongo.repository.ts      # Implementação concreta (MongoDB)
+│   │   └── weather.repository.interface.ts  # Contrato da interface (DIP)
+│   └── ...
+└── app.module.ts               # Módulo raiz (Orquestrador da aplicação)
+
 
 ```
 
@@ -48,6 +65,12 @@ src/
     - Analisa os últimos 10 registros climáticos.
     - Gera insights de texto, alertas e **previsões numéricas** para a próxima hora.
     - Retorna JSON estruturado garantido via prompt engineering.
+4.  **Middleware (System Log)**
+    - Interceptação Inicial: Ao receber a requisição, ele captura instantaneamente o ip, o método HTTP (GET, POST, etc.) e a URL original.
+    - Cálculo de Latência: Armazena o timestamp de início (start) para calcular o tempo de resposta.
+    - Evento on('finish'): O middleware anexa um ouvinte ao evento finish da resposta. Isso garante que o log só seja gerado após o servidor terminar de processar tudo e devolver o status code ao cliente.
+    - Contexto de Usuário: Se a rota for protegida (via JWT Guard), ele extrai os dados do usuário anexados ao objeto req['user']. Se for uma rota pública, esses campos são gravados como null.
+    - Política de Retenção: A collection possui um índice TTL (Time-To-Live) configurado para 7 dias. Logs mais antigos que esse período são removidos automaticamente pelo banco de dados para economizar armazenamento.
 
 ## 🧪 Testes e Qualidade
 
@@ -116,11 +139,11 @@ npm run test:cov
     MONGO_URI=mongodb://localhost:27017/gdash
     RABBITMQ_URI=amqp://user:password@rabbitmq:5672
     JWT_SECRET=seu_segredo_super_secreto
-    GEMINI_API_KEY=sua_chave_do_google_ai_studio
+    GEMINI_API_KEY=sua_chave_do_google_ai_studio # A API_KEY do Gemini costuma ser invalidada com frequência pela busca do Google de keys expostas. Caso isso ocorra, gere sua propria e coloque nesse .env pelo site https://aistudio.google.com/app/api-keys
     DEFAULT_ADMIN_EMAIL=admin@gdash.com
     DEFAULT_ADMIN_PASSWORD=admin1234
 
-
+    #Gemini Key utilizada nesse projeto:AIzaSyApp6ZFuZQgQbENrT_hri_Q8VBpFA9kdz0
 
 
     ```
